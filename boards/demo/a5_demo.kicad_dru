@@ -1,0 +1,6 @@
+(version 1)
+(rule "вскрытие" (condition "A.Type == 'Via'") (constraint clearance (min 0.275mm)))
+(rule "V2" (condition "A.NetName == 'S2'") (constraint clearance (min 0.175mm)))
+(rule "V3" (condition "A.NetName == 'S3'") (constraint clearance (min 0.125mm)))
+(rule "V4" (condition "A.NetName == 'S4'") (constraint clearance (min 0.125mm)))
+(rule "поле L3" (layer "In2.Cu") (condition "A.NetClass == 'BGA'") (constraint clearance (min 0.2mm)))

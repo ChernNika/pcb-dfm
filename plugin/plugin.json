@@ -1,0 +1,19 @@
+{
+  "$schema": "https://go.kicad.org/api/schemas/v1",
+  "identifier": "ru.dfm.check",
+  "name": "Проверка технологичности (DFM)",
+  "description": "Правила A1, A3, A5, A7, B1 по профилю изготовителя: отчёт в браузере, показ находок на плате",
+  "runtime": { "type": "python" },
+  "actions": [
+    {
+      "identifier": "check",
+      "name": "Проверить технологичность",
+      "description": "Проверить открытую плату (с несохранёнными правками) и открыть отчёт",
+      "show-button": true,
+      "scopes": ["pcb"],
+      "entrypoint": "dfm_plugin.py",
+      "icons-light": ["icon_light.png", "icon_light@2x.png"],
+      "icons-dark": ["icon_dark.png", "icon_dark@2x.png"]
+    }
+  ]
+}

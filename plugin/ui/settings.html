@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Проверка технологичности</title>
+    <style>
+        :root {
+            --bg: #fbfaf7;
+            --fg: #1f2328;
+            --card: #fff;
+            --line: #e3e0d8;
+            --mute: #6b6f76;
+            --acc: #1f6feb;
+        }
+
+        @media (prefers-color-scheme:dark) {
+            :root {
+                --bg: #16181c;
+                --fg: #e6e6e6;
+                --card: #1f2228;
+                --line: #30343b;
+                --mute: #9aa0a6;
+                --acc: #4c8dff;
+            }
+        }
+
+        body {
+            font: 15px/1.45 system-ui,sans-serif;
+            margin: 24px auto;
+            max-width: 760px;
+            padding: 0 16px;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        pre {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 60vh;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+
+        fieldset {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--card);
+            margin: 0 0 14px;
+            padding: 10px 14px;
+        }
+
+        legend {
+            font-weight: 600;
+            padding: 0 4px;
+        }
+
+        label {
+            display: block;
+            margin: 4px 0;
+        }
+
+        small {
+            color: var(--mute);
+        }
+
+        select {
+            font: inherit;
+            padding: 4px;
+            max-width: 100%;
+            background: var(--card);
+            color: var(--fg);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+        }
+
+        button {
+            font: inherit;
+            padding: 8px 18px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--acc);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: .5;
+        }
+
+        .cls {
+            display: inline-block;
+            margin-right: 16px;
+        }
+
+        .err {
+            display: block;
+            color: #d1242f;
+            white-space: pre-wrap;
+        }
+
+        #msg {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Проверка технологичности</h1>
+    <div id="setup">
+        <p id="msg">загрузка настроек…</p>
+        <form id="f" hidden>
+            <fieldset>
+                <legend>Профиль завода</legend>
+                <select id="profile"></select><br>
+                <small id="pnote"></small>
+                <small id="perr" class="err"></small>
+            </fieldset>
+            <fieldset>
+                <legend>Классы проверок</legend>
+                <div id="classes"></div>
+            </fieldset>
+            <fieldset id="b1box">
+                <legend>B1 — кислотные ловушки</legend>
+                <label>Процесс травления <select id="proc"></select></label>
+                <small>С — интенсивное травление и хорошая промывка, О — обычный процесс, З — застойные зоны (без купона — З)</small>
+                <label>Оценка <select id="method"></select></label>
+            </fieldset>
+            <button id="go" type="submit">Проверить</button><span id="err" class="err"></span>
+        </form>
+    </div>
+    <div id="run" hidden>
+        <p id="st">запуск…</p>
+        <pre id="log"></pre>
+    </div>
+    <script>
+const TOKEN = '__DFM_TOKEN__';
+const classNames = {
+    A1: 'ширина и зазоры',
+    A3: 'пояски и совмещение',
+    A5: 'зазоры в сплошных слоях',
+    A7: 'паяльная маска',
+    B1: 'кислотные ловушки и шипы',
+};
+const byId = id => document.getElementById(id);
+let options;
+
+async function getJSON(url, request) {
+    const response = await fetch(url, request);
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error('ответ сервера ' + response.status + ': ' + (text.slice(0, 300) || 'пустой'));
+    }
+}
+
+function showProcesses() {
+    const profile = options.profiles.find(item => !item.error && item.path === byId('profile').value);
+    const select = byId('proc');
+    select.replaceChildren(...profile.b1_processes.map(name => new Option(name, name)));
+    const previous = options.last.b1_process;
+    select.value = profile.b1_processes.includes(previous) ? previous : profile.b1_process;
+    byId('pnote').textContent = profile.illustrative
+        ? 'числа условные (иллюстративные) — для демонстрации метода' : '';
+}
+
+function showClasses() {
+    const selected = Array.isArray(options.last.classes) ? options.last.classes : options.classes;
+    for (const code of options.classes) {
+        const label = document.createElement('label');
+        label.className = 'cls';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = code;
+        checkbox.checked = selected.includes(code);
+        const description = document.createElement('small');
+        description.textContent = classNames[code] || '';
+        label.append(checkbox, ' ' + code + ' ', description);
+        byId('classes').append(label);
+    }
+}
+
+async function init() {
+    try {
+        options = await getJSON('options');
+    } catch (error) {
+        byId('msg').textContent = 'нет связи с плагином: ' + error.message;
+        return;
+    }
+    if (options.error) {
+        byId('msg').textContent = 'Не удалось получить настройки: ' + options.error;
+        return;
+    }
+    if (!options.last || typeof options.last !== 'object') options.last = {};
+    if (options.running) {
+        showProgress();
+        return;
+    }
+
+    const valid = options.profiles.filter(profile => !profile.error);
+    const invalid = options.profiles.filter(profile => profile.error);
+    if (!valid.length) {
+        const errors = invalid.map(profile => profile.path + ': ' + profile.error);
+        byId('msg').textContent = 'Ни один профиль завода не читается:\n' + errors.join('\n');
+        return;
+    }
+    const select = byId('profile');
+    for (const profile of valid) select.add(new Option(profile.name, profile.path));
+    for (const profile of invalid) {
+        const option = new Option((profile.name || profile.path) + ' — ошибка профиля', profile.path);
+        option.disabled = true;
+        select.add(option);
+    }
+    byId('perr').textContent = invalid.map(item => 'не читается ' + item.path + ': ' + item.error).join('\n');
+    if (valid.some(item => item.path === options.last.profile)) select.value = options.last.profile;
+
+    showClasses();
+    const method = byId('method');
+    for (const [key, name] of Object.entries(options.b1_methods)) method.add(new Option(name, key));
+    if (options.last.b1_method in options.b1_methods) method.value = options.last.b1_method;
+    showProcesses();
+    select.onchange = showProcesses;
+    byId('msg').hidden = true;
+    byId('f').hidden = false;
+}
+
+byId('f').onsubmit = async event => {
+    event.preventDefault();
+    byId('go').disabled = true;
+    byId('err').textContent = '';
+    const checked = document.querySelectorAll('#classes input:checked');
+    const choice = {
+        profile: byId('profile').value,
+        classes: Array.from(checked, input => input.value),
+        b1_process: byId('proc').value,
+        b1_method: byId('method').value,
+    };
+    try {
+        const result = await getJSON('start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-DFM-Token': TOKEN},
+            body: JSON.stringify(choice),
+        });
+        if (!result.ok) throw new Error(result.error);
+        showProgress();
+    } catch (error) {
+        byId('err').textContent = 'Не удалось начать: ' + error.message;
+        byId('go').disabled = false;
+    }
+};
+
+function showProgress() {
+    byId('setup').hidden = true;
+    byId('run').hidden = false;
+    pollStatus();
+}
+
+let failures = 0;
+async function pollStatus() {
+    try {
+        const status = await getJSON('status');
+        failures = 0;
+        byId('st').textContent = status.state + ' · ' + status.elapsed + ' с';
+        byId('log').textContent = status.log.join('\n');
+        if (status.state === 'готово') {
+            location.href = 'report.html';
+            return;
+        }
+        if (status.state === 'ошибка') {
+            const link = document.createElement('a');
+            link.href = './';
+            link.textContent = 'к настройкам';
+            byId('st').append(' · ', link);
+            return;
+        }
+    } catch (error) {
+        failures += 1;
+        if (failures >= 10) {
+            byId('st').textContent = 'сервер плагина не отвечает (' + error.message
+                + ') — вероятно, он завершён; запустите проверку снова кнопкой в KiCad';
+            return;
+        }
+    }
+    setTimeout(pollStatus, 700);
+}
+
+init();
+    </script>
+</body>
+</html>

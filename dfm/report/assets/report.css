@@ -1,0 +1,570 @@
+:root {
+    --bg: #fbfaf7;
+    --fg: #1f2328;
+    --mut: #5b6470;
+    --card: #ffffff;
+    --line: #e3e0d8;
+    --cu: #d95b30;
+    --win: #2e7d32;
+    --hole: #fbfaf7;
+    --off: #cfcfcf;
+    --err: #c0392b;
+    --warn: #d97a12;
+    --info: #2e86c1;
+    --nc: #7f8c8d;
+    --board: #efe7cf;
+}
+
+@media (prefers-color-scheme:dark) {
+    :root:not([data-theme=light]) {
+        --bg: #16181c;
+        --fg: #e6e6e6;
+        --mut: #9aa3ad;
+        --card: #1f2228;
+        --line: #30343b;
+        --cu: #e0794f;
+        --win: #5fbf63;
+        --hole: #16181c;
+        --off: #3a3d44;
+        --board: #2b2a24;
+    }
+}
+
+:root[data-theme=dark] {
+    --bg: #16181c;
+    --fg: #e6e6e6;
+    --mut: #9aa3ad;
+    --card: #1f2228;
+    --line: #30343b;
+    --cu: #e0794f;
+    --win: #5fbf63;
+    --hole: #16181c;
+    --off: #3a3d44;
+    --board: #2b2a24;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+
+.wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+h1 {
+    font-size: 22px;
+    margin: 4px 0;
+}
+
+h2 {
+    font-size: 17px;
+    margin: 22px 0 8px;
+}
+
+h3 {
+    font-size: 15px;
+    margin: 4px 0 6px;
+    font-weight: 600;
+}
+
+h4 {
+    margin: 10px 0 4px;
+    font-size: 13px;
+    color: var(--mut);
+}
+
+.sub {
+    color: var(--mut);
+}
+
+.warnline {
+    background: #fff4d6;
+    color: #6b4e00;
+    border: 1px solid #f0d58a;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin: 8px 0;
+}
+
+@media (prefers-color-scheme:dark) {
+    :root:not([data-theme=light]) .warnline {
+        background: #3a3218;
+        color: #f0d58a;
+        border-color: #6b5a20;
+    }
+}
+
+:root[data-theme=dark] .warnline {
+    background: #3a3218;
+    color: #f0d58a;
+    border-color: #6b5a20;
+}
+
+.totals {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+}
+
+.tot {
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+.tot b {
+    font-size: 18px;
+}
+
+.tot.err b {
+    color: var(--err);
+}
+
+.tot.warn b {
+    color: var(--warn);
+}
+
+.tot.info b {
+    color: var(--info);
+}
+
+.tot.nc b {
+    color: var(--nc);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: minmax(0,1.25fr) minmax(0,1fr);
+    gap: 16px;
+}
+
+@media (max-width:860px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+table.summary {
+    border-collapse: collapse;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 14px;
+}
+
+.summary th,.summary td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+}
+
+.summary td:nth-child(n+3),.summary th:nth-child(n+3) {
+    text-align: center;
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+.cnt {
+    border: 0;
+    border-radius: 5px;
+    padding: 1px 8px;
+    color: #fff;
+    min-width: 30px;
+}
+
+.cnt.err {
+    background: var(--err);
+}
+
+.cnt.warn {
+    background: var(--warn);
+}
+
+.cnt.info {
+    background: var(--info);
+}
+
+.cnt.nc {
+    background: var(--nc);
+}
+
+.lnk {
+    border: 0;
+    background: none;
+    color: var(--info);
+    padding: 0;
+    font-weight: 600;
+}
+
+.overview {
+    width: 100%;
+    height: auto;
+    max-height: 420px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.overview .board {
+    fill: var(--board);
+    stroke: var(--mut);
+    stroke-width: .1;
+}
+
+.overview .holes {
+    stroke: var(--mut);
+    stroke-linecap: round;
+    opacity: .35;
+}
+
+.om {
+    fill-opacity: .25;
+    stroke-width: .25;
+}
+
+.om.err {
+    fill: var(--err);
+    stroke: var(--err);
+}
+
+.om.warn {
+    fill: var(--warn);
+    stroke: var(--warn);
+}
+
+.om.info {
+    fill: var(--info);
+    stroke: var(--info);
+}
+
+.om.hide {
+    display: none;
+}
+
+.controls {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.controls label {
+    white-space: nowrap;
+}
+
+.controls input[type=search],.controls select {
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--fg);
+}
+
+.controls input[type=search] {
+    flex: 1;
+    min-width: 180px;
+}
+
+.chip {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--fg);
+    border-radius: 14px;
+    padding: 3px 10px;
+}
+
+.chip.on {
+    background: var(--fg);
+    color: var(--bg);
+}
+
+#shown {
+    color: var(--mut);
+    margin-left: auto;
+}
+
+.card {
+    display: flex;
+    gap: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--nc);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 10px 0;
+    content-visibility: auto;
+    contain-intrinsic-size: 220px;
+}
+
+.card.err {
+    border-left-color: var(--err);
+}
+
+.card.warn {
+    border-left-color: var(--warn);
+}
+
+.card.info {
+    border-left-color: var(--info);
+}
+
+.card.flash {
+    outline: 3px solid var(--info);
+}
+
+.card .body {
+    flex: 1;
+    min-width: 0;
+}
+
+.head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.badge {
+    font-size: 12px;
+    color: #fff;
+    border-radius: 4px;
+    padding: 1px 7px;
+}
+
+.badge.err {
+    background: var(--err);
+}
+
+.badge.warn {
+    background: var(--warn);
+}
+
+.badge.info {
+    background: var(--info);
+}
+
+.badge.nc {
+    background: var(--nc);
+}
+
+.code {
+    font-weight: 700;
+}
+
+.cname {
+    color: var(--mut);
+}
+
+/* коды дефектов — шрифтом с засечками: в нём «З» (кириллица) не похожа на цифру 3 */
+.code,.lnk,.codef {
+    font-family: Georgia,"Times New Roman",serif;
+}
+
+.theme {
+    position: fixed;
+    top: 10px;
+    right: 12px;
+    z-index: 3;
+}
+
+.meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--mut);
+    font-size: 13px;
+}
+
+.dq {
+    font-style: italic;
+}
+
+.card p {
+    margin: 4px 0;
+}
+
+.fix {
+    background: rgba(46,134,193,.08);
+    border-radius: 6px;
+    padding: 5px 8px;
+}
+
+details summary {
+    cursor: pointer;
+    color: var(--info);
+    margin-top: 6px;
+}
+
+table.kv {
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.kv th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--mut);
+    padding: 2px 12px 2px 0;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.kv td {
+    padding: 2px 0;
+    word-break: break-word;
+}
+
+.uids {
+    font-size: 11px;
+    color: var(--mut);
+    word-break: break-all;
+}
+
+.kicad {
+    display: none;
+    border: 1px solid var(--info);
+    color: var(--info);
+    background: none;
+    border-radius: 6px;
+    padding: 2px 10px;
+    margin-top: 4px;
+}
+
+body.live .kicad {
+    display: inline-block;
+}
+
+.kres {
+    color: var(--mut);
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+.pic {
+    flex: 0 0 220px;
+}
+
+.crop {
+    width: 220px;
+    height: 220px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    display: block;
+}
+
+.crop .bg {
+    fill: var(--bg);
+}
+
+.crop .off {
+    fill: var(--off);
+}
+
+.crop .cu {
+    fill: var(--cu);
+    fill-opacity: .85;
+    fill-rule: evenodd;
+}
+
+.crop .win {
+    fill: var(--win);
+    fill-opacity: .18;
+    stroke: var(--win);
+    stroke-width: .012;
+    fill-rule: evenodd;
+}
+
+.crop .hole {
+    fill: var(--hole);
+    stroke: var(--mut);
+    stroke-width: .006;
+}
+
+.mk {
+    fill: none;
+}
+
+.mk.err {
+    stroke: var(--err);
+}
+
+.mk.warn {
+    stroke: var(--warn);
+}
+
+.mk.info {
+    stroke: var(--info);
+}
+
+.mk.nc {
+    stroke: var(--nc);
+}
+
+.mk2 {
+    fill: none;
+    stroke: var(--fg);
+    stroke-opacity: .6;
+}
+
+.mkl {
+    stroke: var(--fg);
+}
+
+.scale {
+    font-size: 11px;
+    color: var(--mut);
+    text-align: center;
+    margin-top: 2px;
+}
+
+@media (max-width:620px) {
+    .card {
+        flex-direction: column;
+    }
+    .pic {
+        flex-basis: auto;
+    }
+    .crop {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1;
+    }
+}
+
+.empty {
+    color: var(--mut);
+    padding: 20px;
+    text-align: center;
+}
+
+footer {
+    color: var(--mut);
+    font-size: 13px;
+    margin: 30px 0 10px;
+}

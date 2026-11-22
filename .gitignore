@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# тяжёлые промежуточные массивы моделирования (пересчитываются скриптами)
+research/**/data/
+
+# собранные документы (исходники лежат в docs/ и research/*/md)
+docs/out/
+
+# служебные файлы KiCad
+*.kicad_prl
+*-backups/
+fp-info-cache
+~*.lck
+_autosave-*
+
+# временные выгрузки kicad-cli
+boards/**/_export/
+
+# отчёты python -m dfm compare (по умолчанию)
+compare_out/
+
+# отчёты python -m dfm check (по умолчанию)
+check_*/
+
+# вывод профилировщика (cProfile.run(..., "p")) — писать в scratchpad, но на всякий случай
+/p
+/p[0-9]
+/prof
+
+# платы-полигоны шага 2.6 пересобираются research/validation/inject.py
+research/validation/inject_board/
+
+# отчёты и настройки плагина при запуске из папки plugin
+plugin/reports/
+plugin/config.json
+
+# история локальных правок KiCad 10
+.history/

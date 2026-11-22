@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcb-dfm"
+version = "0.1.0"
+description = "Анализ технологичности печатных плат на этапе трассировки (KiCad): правила + нейросетевой слой"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "shapely>=2.0",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+docs = ["pypandoc_binary>=1.13", "pymupdf>=1.24"]
+# нейросети классов B; версия для процессора: pip install torch --index-url https://download.pytorch.org/whl/cpu
+ml = ["torch>=2.4"]
+
+[tool.setuptools.packages.find]
+include = ["dfm*"]
+
+[tool.setuptools.package-data]
+"dfm.report" = ["assets/*.css", "assets/*.js"]
+"dfm.rules" = ["profiles/*.toml"]
+"dfm.ml" = ["weights/*.npz", "tables/*.npz"]
+
+[tool.setuptools.data-files]
+"share/pcb-dfm/plugin" = ["plugin/dfm_plugin.py", "plugin/plugin.json", "plugin/requirements.txt", "plugin/*.png", "plugin/README.md"]
+"share/pcb-dfm/plugin/ui" = ["plugin/ui/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["kicad: запускает kicad-cli (несколько секунд)"]
