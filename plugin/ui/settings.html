@@ -65,7 +65,13 @@
             color: var(--mute);
         }
 
-        select {
+        .calculators { margin-bottom: 1rem; }
+        .calculators a { color: var(--acc); }
+        #parameters label { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+        #parameters input { width:7em; }
+        summary { cursor:pointer; }
+
+        #parameters input, select {
             font: inherit;
             padding: 4px;
             max-width: 100%;
@@ -107,6 +113,8 @@
 </head>
 <body>
     <h1>Проверка технологичности</h1>
+    <p>Проверка включает оценку выхода годных плат по слоям меди и сверловке из открытого проекта.</p>
+    <nav class="calculators"><a href="gerber.html?source=files">Проверить свой комплект Gerber</a></nav>
     <div id="setup">
         <p id="msg">загрузка настроек…</p>
         <form id="f" hidden>
@@ -120,6 +128,9 @@
                 <legend>Классы проверок</legend>
                 <div id="classes"></div>
             </fieldset>
+            <fieldset><details><summary>Параметры производства</summary>
+                <div id="parameters"></div>
+            </details></fieldset>
             <fieldset id="b1box">
                 <legend>B1 — кислотные ловушки</legend>
                 <label>Процесс травления <select id="proc"></select></label>
@@ -157,12 +168,51 @@ async function getJSON(url, request) {
 
 function showProcesses() {
     const profile = options.profiles.find(item => !item.error && item.path === byId('profile').value);
+    renderParameters(profile);
     const select = byId('proc');
     select.replaceChildren(...profile.b1_processes.map(name => new Option(name, name)));
     const previous = options.last.b1_process;
     select.value = profile.b1_processes.includes(previous) ? previous : profile.b1_process;
     byId('pnote').textContent = profile.illustrative
         ? 'числа условные (иллюстративные) — для демонстрации метода' : '';
+}
+
+function renderParameters(profile) {
+    const container = byId('parameters');
+    container.replaceChildren();
+    for (const [key, field] of Object.entries(profile.parameters?.fields || {})) {
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = 'any';
+        input.min = '0';
+        input.value = field.value;
+        input.required = true;
+        input.dataset.key = key;
+        input.dataset.original = field.value;
+        input.oninput = () => input.setCustomValidity(field.positive && input.valueAsNumber <= 0 ? 'Введите число больше нуля' : '');
+        label.append(field.label + ' ', input);
+        container.append(label);
+    }
+}
+
+function changedParameters() {
+    const fields = {};
+    for (const input of byId('parameters').querySelectorAll('input')) {
+        if (Number.isFinite(input.valueAsNumber) && input.valueAsNumber !== Number(input.dataset.original)) {
+            fields[input.dataset.key] = input.valueAsNumber;
+        }
+    }
+    return fields;
+}
+
+for (const link of document.querySelectorAll('.calculators a')) {
+    link.onclick = event => {
+        if (!byId('f').hidden && !byId('f').reportValidity()) { event.preventDefault(); return; }
+        if (!byId('profile').options.length) return;
+        const context = {path: byId('profile').value, changes: changedParameters()};
+        try { sessionStorage.setItem('dfm-calc-profile', JSON.stringify(context)); } catch {}
+    };
 }
 
 function showClasses() {
@@ -231,6 +281,7 @@ byId('f').onsubmit = async event => {
     byId('err').textContent = '';
     const checked = document.querySelectorAll('#classes input:checked');
     const choice = {
+        parameters: changedParameters(),
         profile: byId('profile').value,
         classes: Array.from(checked, input => input.value),
         b1_process: byId('proc').value,

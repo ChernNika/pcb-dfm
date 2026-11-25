@@ -59,8 +59,17 @@ def _check(args):
     return 1 if any(f.severity is Severity.ERROR for f in findings) else 0
 
 
+def _export_gerber(args):
+    from . import kicad_cli
+
+    kicad_cli.export_gerbers(args.board, args.out, check_zones=True)
+    kicad_cli.export_drill(args.board, args.out)
+    return 0
+
+
 def _profiles(args):
     """Встроенные профили и профили из --dir → JSON: имя, путь, условный ли, процесс B1, есть ли нейросеть."""
+    from .process_parameters import process_parameters
     from .rules.profile import DEFAULT_PROFILE, load_profile
     files = sorted(DEFAULT_PROFILE.parent.glob('*.toml'))
     for d in args.dir or []:
@@ -72,7 +81,7 @@ def _profiles(args):
             pr = load_profile(path or None)
             check_shape(pr)
             out.append(dict(path=path, name=str(pr.get('meta', {}).get('name', f.stem)), illustrative=pr.illustrative,
-                            b1_process=str(pr['b1']['process']), b1_processes=list(pr['b1'].get('process_params', {}))))
+                            parameters=process_parameters(pr), b1_process=str(pr['b1']['process']), b1_processes=list(pr['b1'].get('process_params', {}))))
         except Exception as e:
             out.append(dict(path=path, name=f.stem, error=f'{type(e).__name__}: {e}'))
     try:
@@ -204,6 +213,11 @@ def main(argv=None):
                            help='изменить значение профиля, например b1.process=О или b1.method=formula '
                                 '(ключ должен быть в профиле; число можно с запятой)')
     check_cmd.set_defaults(func=_check, parser=check_cmd)
+
+    export_cmd = commands.add_parser('export-gerber', help='выгрузить слои Gerber и сверловку Excellon через KiCad')
+    export_cmd.add_argument('board')
+    export_cmd.add_argument('--out', required=True)
+    export_cmd.set_defaults(func=_export_gerber)
 
     profiles_cmd = commands.add_parser('profiles', help='профили завода (JSON) для страницы настроек плагина')
     profiles_cmd.add_argument('--dir', action='append', help='ещё папка с профилями .toml')

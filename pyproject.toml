@@ -30,7 +30,7 @@ include = ["dfm*"]
 
 [tool.setuptools.data-files]
 "share/pcb-dfm/plugin" = ["plugin/dfm_plugin.py", "plugin/plugin.json", "plugin/requirements.txt", "plugin/*.png", "plugin/README.md"]
-"share/pcb-dfm/plugin/ui" = ["plugin/ui/*.html"]
+"share/pcb-dfm/plugin/ui" = ["plugin/ui/*.html", "plugin/ui/*.js", "plugin/ui/*.css", "plugin/ui/JSZip-LICENSE.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

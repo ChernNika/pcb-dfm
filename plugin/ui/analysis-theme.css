@@ -1,0 +1,8 @@
+/* Самостоятельная страница использует ту же палитру, что отчёт DFM. */
+:root{--bg:#fbfaf7;--fg:#1f2328;--card:#fff;--mut:#5b6470;--line:#e3e0d8;--cu:#d95b30;--board:#efe7cf;--info:#2e86c1;--hole:#fbfaf7}
+@media(prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#e6e6e6;--card:#1f2228;--mut:#9aa3ad;--line:#30343b;--cu:#e0794f;--board:#2b2a24;--info:#72b3df;--hole:#16181c;color-scheme:dark}}
+:root,:host{--surface:var(--card);--ink:var(--fg);--muted:var(--mut);--sub:var(--bg);--chip-bg:var(--bg);
+  --copper:var(--cu);--copper-soft:var(--board);--accent:var(--info);--good:#37865b;--bad:#c44836;--warn:#b27b16;
+  --c3:var(--cu);--c2:var(--info);--c1:var(--good);--ok-fill:rgba(48,145,90,.35);
+  --f-body:system-ui,"Segoe UI",sans-serif;--f-display:var(--f-body);--f-mono:ui-monospace,Consolas,monospace}
+:host{display:block;color:var(--ink);font:inherit}

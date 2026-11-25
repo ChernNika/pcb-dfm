@@ -37,3 +37,31 @@ def test_filter_hides_cards():
     """Фильтры скрывают карточки атрибутом hidden; у .card свой display:flex, он перебивает правило браузера."""
     from dfm.report.html import CSS
     assert re.search(r'\[hidden\]\s*\{\s*display:\s*none\s*!important;?\s*\}', CSS)
+
+
+def test_yield_panel_uses_supplied_gerbers(tmp_path, monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from dfm.report import yield_panel
+
+    folder = tmp_path / 'gerber'
+    folder.mkdir()
+    copper = '%TF.FileFunction,Copper,L1,Top*%\\n%FSLAX46Y46*%\\n%MOMM*%\\nM02*'
+    (folder / 'top.gbr').write_text(copper, encoding='utf-8')
+    (folder / 'board.drl').write_text('M48\\nMETRIC\\nT1C0.30\\n%\\nT1\\nX1.0Y2.0\\nM30', encoding='utf-8')
+    profile = load_profile()
+    profile['drilling']['sigma_drill_um'] = 17.25
+    board = SimpleNamespace(path=folder)
+
+    def missing_cli(*args, **kwargs):
+        raise FileNotFoundError('нет KiCad')
+
+    monkeypatch.setattr(yield_panel.kicad_cli, 'export_gerbers', missing_cli)
+    page = yield_panel.report_panel(board, profile)
+    data = json.loads(re.search(r'id="yield-data">(.*?)</script>', page, re.S)[1])
+    assert data['profile']['fields']['drilling.sigma_drill_um']['value'] == 17.25
+    assert {f['name'] for f in data['files']} == {'board.drl', 'top.gbr'}
+    assert 'id="pad-model"' in page
+    board.path = tmp_path / 'board.kicad_pcb'
+    fallback = yield_panel.report_panel(board, profile)
+    assert 'нет KiCad' in fallback and 'id="yield-data"' not in fallback

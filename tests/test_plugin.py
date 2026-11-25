@@ -86,6 +86,10 @@ def test_plugin_flow(tmp_path):
         opts = json.loads(_get(base + '/options')[1])
         assert {'A1', 'A7', 'B1'} <= set(opts['classes']) and opts['profiles'][0]['path'] == ''
         assert set(opts['b1_methods']) >= {'formula', 'doc_table'}
+        assert 'gerber.html?source=files' in page and 'оценку выхода годных' in page
+        assert tok in _get(base + '/gerber.html')[1]
+        assert 'Вероятность годности переходного отверстия' in _get(base + '/via.html')[1]
+        assert opts['profiles'][0]['parameters']['fields']['drilling.sigma_drill_um']['value'] >= 0
         bad = _post(base + '/start', dict(profile='C:/чужой.toml', classes=['A7']), token=tok)
         assert not bad['ok'] and 'профиль' in bad['error']                # только профили из списка
         # не JSON — отказ (защита от чужих страниц)
@@ -101,6 +105,11 @@ def test_plugin_flow(tmp_path):
         assert any('b1.process=О' in line for line in st['log']) and any('находок' in line for line in st['log'])
         code, rep = _get(base + '/report.html')
         assert code == 200 and 'button class="kicad"' in rep and 'Проверить снова' in rep
+        assert 'Выход годных плат' in rep
+        if 'id="yield-data"' in rep:  # при установленном kicad-cli отчёт хранит свой снимок
+            payload = json.loads(re.search(r'id="yield-data">(.*?)</script>', rep, re.S)[1])
+            assert any(f.get('role') == 'copper:Top' for f in payload['files'])
+            assert any(f['name'].endswith('.drl') for f in payload['files'])
         assert re.search(rf"\.set\('X-DFM-Token',\s*'{re.escape(tok)}'\)", rep)             # кнопки отчёта шлют ключ сеанса
         assert re.search(r'\.origin\s*===\s*location\.origin', rep)                  # …только на свой адрес
         assert (tmp_path / 'out' / '.dfm-report').exists()        # папка отчёта помечена как своя
@@ -122,10 +131,15 @@ def test_plugin_install(tmp_path):
     from dfm.plugin_install import install
     dest = install(tmp_path / 'ru.dfm.check', python='C:/py/python.exe')
     assert (dest / 'plugin.json').exists() and (dest / 'dfm_plugin.py').exists()
+    for name in ('gerber.html', 'via.html', 'gerber-engine.js', 'jszip.min.js', 'via.css', 'via-view.js', 'analysis-theme.css', 'calc-profile.js'):
+        assert (dest / 'ui' / name).is_file()
     cfg = json.loads((dest / 'config.json').read_text(encoding='utf-8'))
     assert cfg['python'] == 'C:/py/python.exe'
     cfg['last'] = {'b1_process': 'О'}                           # выбор на странице настроек переживает переустановку
     (dest / 'config.json').write_text(json.dumps(cfg), encoding='utf-8')
+    if sys.platform == 'win32':  # прежние установки могли скопировать атрибут каталога из OneDrive
+        import stat
+        (dest / 'ui').chmod(stat.S_IREAD)
     dest = install(dest, python='C:/py/python.exe')
     assert json.loads((dest / 'config.json').read_text(encoding='utf-8'))['last'] == {'b1_process': 'О'}
     from kipy.packaging import validate
@@ -382,3 +396,53 @@ def test_page_scripts_parse(tmp_path):
             p.write_text(js, encoding='utf-8')
             r = subprocess.run([node, '--check', str(p)], capture_output=True, text=True)
             assert r.returncode == 0, r.stderr
+
+    for script in (ROOT / 'plugin' / 'ui').glob('*.js'):
+        subprocess.run([node, '--check', str(script)], check=True)
+
+    # Нулевое СКО с постоянным сдвигом и погрешность только по одной оси.
+    subprocess.run([node, '-e', """
+        const assert = require('node:assert/strict');
+        const g = require('./plugin/ui/gerber-engine.js');
+        assert.equal(g.circleProb(0.1, 0.05, 0, 0), 1);
+        assert.equal(g.circleProb(0.1, 0.12, 0, 0), 0);
+        const map = {G:3, Rmax:1, step:1, map:[0,0,0,0,1,0,0,0,0]};
+        assert.ok(Math.abs(g.mapProb(map,0,0,1,0,0)-0.382925) < 1e-5);
+        assert.ok(g.mapProb(map,0.25,0.25,1e-8,1e-8,0) > 0.99999);
+        const pad = {padInsc:0.2, Rd:0.1, tear:true, traces:[{w:0.15,tear:true},{w:0.15,tear:false}]};
+        const criteria = {kred:0, ringReq:0.05};
+        const mixed = g.circularPad(pad,3,0.15,0.01,criteria);
+        pad.traces[1].tear = true;
+        assert.ok(mixed.R < g.circularPad(pad,3,0.15,0.01,criteria).R);
+        const drill = ['M48','; #@! TF.FileFunction,Plated,1,2,Blind','METRIC','T1C0.30','%','T1','X1.0Y2.0','M30'];
+        const holes = g.parseExcellon(drill.join(String.fromCharCode(10)),'board.drl').holes;
+        assert.deepEqual(holes[0].span,[1,2]);
+        assert.deepEqual(g.analyzeLayer(null,{number:3,prims:[]},holes,{}),[]);
+    """], cwd=ROOT, check=True)
+
+
+def test_process_parameter_overrides():
+    import pytest
+    from dfm.process_parameters import process_parameters
+    from dfm.profile_options import set_value
+    from dfm.rules.profile import load_profile
+
+    profile = load_profile()
+    mod = _plugin()
+    params = process_parameters(profile)
+    opts = dict(profiles=[dict(path='', parameters=params)], classes=['A7'])
+    choice = dict(classes=['A7'], parameters={'drilling.sigma_drill_um': 12.5, 'etch.etch_factor': 2.25})
+    args = mod.check_args(choice, opts)
+    assert args == ['--set', 'drilling.sigma_drill_um=12.5', '--set', 'etch.etch_factor=2.25']
+    for value in args[1::2]:
+        set_value(profile, value)
+    assert profile['drilling']['sigma_drill_um'] == 12.5
+    assert profile['etch']['etch_factor'] == 2.25
+    for invalid in ({'unknown': 1}, {'etch.etch_factor': 0}, {'drilling.sigma_drill_um': -1},
+                    {'drilling.sigma_drill_um': float('nan')}):
+        with pytest.raises(ValueError):
+            mod.check_args(dict(choice, parameters=invalid), opts)
+    profile['drilling']['registration_tol_um'] = dict(outer=60, inner=120)
+    fields = process_parameters(profile)['fields']
+    assert fields['drilling.registration_tol_um.outer']['value'] == 60
+    assert 'drilling.sigma_layer_um' not in fields

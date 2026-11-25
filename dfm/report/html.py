@@ -17,6 +17,7 @@ from html import escape
 from pathlib import Path
 
 from ..rules.findings import Severity
+from .yield_panel import report_panel
 from .svg import SEV_CLASS, BoardScene, crop_svg, overview_svg
 
 __all__ = ['write_html', 'CODE_NAMES']
@@ -169,6 +170,7 @@ def write_html(board, ctx, findings, path, pictures: bool = True) -> Path:
 <div class="sub">Профиль: {escape(str(prof_name))}</div>
 {'<div class="warnline">Профиль условный: числа документов, а не данные завода. Вероятности и пороги — иллюстративные.</div>' if profile.illustrative else ''}
 <div class="totals">{totals}</div>
+{report_panel(board, profile) if src else ''}
 <div class="grid"><section><h2>Сводка</h2>{_summary(findings) if findings else '<p class="empty">Находок нет.</p>'}
 <p class="sub">Клик по коду — только этот дефект; по числу — дефект и вердикт.</p></section>
 <section><h2>Плата</h2>{overview_svg(scene, findings) if scene else ''}<p class="sub">Метки — места находок (клик — к карточке).</p></section></div>

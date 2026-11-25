@@ -179,13 +179,15 @@ def _outline(gf) -> tuple[list[Contour], list]:
     return closed, pieces
 
 
-def load_gerber(folder) -> Board:
+def classify_files(folder):
+    """Прочитать назначения слоёв и сверловки без разбора геометрии."""
     folder = Path(folder)
-    if folder.is_file():
-        folder = folder.parent
+    selected_job = folder if folder.is_file() else None
+    if selected_job:
+        folder = selected_job.parent
     warnings: list[str] = []
     files = sorted(p for p in folder.iterdir() if p.is_file())
-    job_path = next((p for p in files if p.suffix.lower() == '.gbrjob'), None)
+    job_path = selected_job or next((p for p in files if p.suffix.lower() == '.gbrjob'), None)
     job = json.loads(job_path.read_text(encoding='utf-8')) if job_path else {}
     if not job:
         warnings.append('нет job-файла (.gbrjob): стек и толщина платы неизвестны')
@@ -220,6 +222,11 @@ def load_gerber(folder) -> Board:
             found.append((p, *g, False))
     if unknown:
         warnings.append('назначение файлов не определено, они пропущены: ' + ', '.join(unknown))
+    return folder, job, found, drills, warnings
+
+
+def load_gerber(folder) -> Board:
+    folder, job, found, drills, warnings = classify_files(folder)
     cu_files = [x for x in found if x[1] == 'Copper']
     if not cu_files:
         raise ValueError(f'{folder}: не найдено ни одного файла меди Gerber')

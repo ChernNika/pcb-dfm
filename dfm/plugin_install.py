@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import sys
 from importlib.metadata import files
 from pathlib import Path
@@ -46,7 +47,7 @@ class InstallError(RuntimeError):
     """Папка назначения — не папка плагина: очищать её нельзя."""
 
 
-def _plugin_source() -> Path:
+def plugin_source() -> Path:
     """В рабочей копии файлы лежат в plugin/, при установке wheel — в share/pcb-dfm/plugin/."""
     checkout = Path(__file__).resolve().parents[1] / 'plugin'
     if (checkout / 'dfm_plugin.py').is_file():
@@ -72,8 +73,21 @@ def is_plugin_dir(dest: Path) -> bool:
         return False
 
 
+def _remove_readonly(operation, name, exc):
+    """При обновлении в Windows папка UI из OneDrive может сохранить флаг «только чтение»."""
+    path = Path(name)
+    if os.name != 'nt' or operation not in (os.rmdir, os.unlink) or not isinstance(exc, PermissionError):
+        raise exc
+    info = path.lstat()
+    if (not info.st_file_attributes & stat.FILE_ATTRIBUTE_READONLY or stat.S_ISLNK(info.st_mode)
+            or getattr(info, 'st_reparse_tag', 0) == stat.IO_REPARSE_TAG_MOUNT_POINT):
+        raise exc
+    path.chmod(info.st_mode | stat.S_IWRITE)
+    operation(name)
+
+
 def install(dest: Path | None = None, python: str | None = None) -> Path:
-    source = _plugin_source()
+    source = plugin_source()
     dest = Path(dest) if dest else default_dest()
     if dest.exists() and not dest.is_dir():
         raise InstallError(f'{dest} — файл, а не папка; укажите папку плагина (пустую или прежней установки)')
@@ -104,7 +118,13 @@ def install(dest: Path | None = None, python: str | None = None) -> Path:
             gone = [f for f in dest.iterdir()
                     if not any(f.resolve() == k or f.resolve() in k.parents for k in keep)]
         for f in gone:
-            shutil.rmtree(f) if f.is_dir() and not f.is_symlink() else f.unlink()
+            if f.is_dir() and not f.is_symlink():
+                if sys.version_info >= (3, 12):
+                    shutil.rmtree(f, onexc=_remove_readonly)
+                else:  # в Python 3.11 обработчик получает тройку sys.exc_info()
+                    shutil.rmtree(f, onerror=lambda op, path, info: _remove_readonly(op, path, info[1]))
+            else:
+                f.unlink()
     dest.mkdir(parents=True, exist_ok=True)
     for f in source.iterdir():
         if f.name in ('__pycache__', 'reports', 'config.json'):

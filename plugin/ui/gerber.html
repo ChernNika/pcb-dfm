@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вероятность выхода годной платы</title>
+<link rel="stylesheet" href="analysis-theme.css">
+<link rel="stylesheet" href="gerber.css">
+<meta name="dfm-token" content="__DFM_TOKEN__">
+</head><body><main class="wrap">
+<nav aria-label="Разделы"><a href="./">Проверка DFM</a></nav>
+<h1>Вероятность выхода годной платы</h1>
+<!-- board-analysis -->
+<div class="workbench">
+<div id="manual-input"><label>Профиль производства <select id="calc-profile"><option value="@manual">Ручной ввод</option></select></label> <small id="profile-note"></small>
+<section class="card" aria-labelledby="h-files">
+  <h2 id="h-files">Файлы</h2>
+  <p>Выберите слои меди Gerber и сверловку Excellon либо загрузите их из редактора KiCad.</p>
+  <div class="drop" id="drop">
+    <div class="row">
+      <button type="button" id="current-board">Из открытой платы KiCad</button>
+      <input type="file" id="fileIn" multiple accept=".gbr,.ger,.gtl,.gbl,.gto,.gbo,.gts,.gbs,.gko,.gm1,.g1,.g2,.g3,.g4,.g5,.g6,.g7,.g8,.g9,.g10,.g11,.g12,.drl,.xln,.txt,.exc,.drd,.zip,.cmp,.sol,.art,.pho">
+      <span class="muted" style="font-size:13px">или перетащите файлы и .zip сюда</span>
+    </div>
+    <div class="row">
+      <span class="muted" style="font-size:13px">Примеры:</span>
+      <button type="button" id="ex1">Обычные площадки</button>
+      <button type="button" id="ex2">Каплевидные площадки</button>
+    </div>
+  </div>
+  <div class="tablewrap"><table id="fileTab"><tr><th>Файл</th><th>Назначение</th><th>Содержимое</th></tr><tr><td colspan="3" class="empty">Файлы не загружены.</td></tr></table></div>
+</section>
+
+</div>
+<section class="result-head">
+  <strong id="yield-value" hidden></strong><span id="yield-caption"></span>
+  <div class="muted" id="status" role="status">Загрузите файлы или откройте пример.</div>
+  <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+</section>
+<details class="analysis-details" id="process-settings"><summary>Параметры расчёта</summary>
+  <div class="params">
+    <div class="group"><h3>Требования приемки</h3>
+      <label class="f" for="cls">Класс применения<select id="cls"><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label>
+      <label class="f" for="ring">Поясок класса 3 на наружном слое, мкм<input type="number" required id="ring" value="50" min="0" step="any"></label>
+      <label class="f" for="ringInner">Поясок класса 3 на внутреннем слое, мкм<input type="number" required id="ringInner" value="50" min="0" step="any"></label>
+      <label class="f" for="breakout">Допустимая дуга разрыва для классов 1–2, °<input required type="number" id="breakout" value="90" min="0" max="180" step="any"></label>
+      <label class="f" for="junc">Ширина соединения с проводником<select id="junc"><option value="ipc">по сечению проводника</option><option value="author">по углам перехода</option><option value="none">не проверять</option></select>
+        <small>«По сечению»: остаток ширины проводника там, где отверстие вышло за КП. «По углам»: эллиптическая область.</small></label>
+      <label class="f" for="kred">Допустимое уменьшение ширины, %<input type="number" required id="kred" value="20" min="0" max="100" step="any"></label>
+      <label class="f" for="kgain">Допустимое увеличение ширины, %<input type="number" required id="kgain" value="20" min="0" max="100" step="any"></label>
+      <label class="f" for="eros">Подтрав края КП e, мкм<input type="number" required id="eros" value="0" min="0" step="any"></label>
+    </div>
+    <div class="group"><h3>Погрешность положения, СКО по оси</h3>
+      <label class="f" for="sl">Совмещение, своё у каждой КП, мкм<input type="number" required id="sl" value="30" min="0" step="any"></label>
+      <label class="f" for="sg">Общий сдвиг наружного слоя, мкм<input type="number" required id="sg" value="0" min="0" step="any"></label>
+      <label class="f" for="sgInner">Общий сдвиг внутреннего слоя, мкм<input type="number" required id="sgInner" value="0" min="0" step="any"></label>
+      <label class="f" for="srot">Поворот слоя, мкрад<input type="number" required id="srot" value="0" min="0" step="any"></label>
+      <label class="f" for="ssc">Масштаб слоя, ppm<input type="number" required id="ssc" value="0" min="0" step="any"></label>
+      <label class="f" for="sd">Сверление, у каждого отверстия, мкм<input type="number" required id="sd" value="0" min="0" step="any"></label>
+      <label class="f" for="mx">Систематический сдвиг X / Y, мкм<span class="row" style="gap:4px"><input type="number" required id="mx" value="0" step="any" aria-label="Сдвиг X"><input type="number" required id="my" value="0" step="any" aria-label="Сдвиг Y"></span></label>
+    </div>
+    <div class="group"><h3>Проводники и травление</h3>
+      <label class="f" for="wminMode">w<sub>min</sub><select id="wminMode"><option value="layer">минимум по слою</option><option value="pad">по проводникам КП</option></select></label>
+      <label class="f" for="hcu">Толщина фольги h, мкм<input type="number" required id="hcu" value="18" min="1" step="any"></label>
+      <label class="f" for="xi">Неровность края ξ, мкм<input type="number" required id="xi" value="20" min="0" step="any"></label>
+      <label class="f" for="F">Фактор травления F<input type="number" required id="F" value="2" min="0.000001" step="any"></label>
+      <label class="f" for="lcorr">Длина независимого участка, мм<input type="number" required id="lcorr" value="0" min="0" step="any">
+        <small>0: P<sub>route</sub> входит один раз на слой. Иначе: P<sub>route</sub><sup>L/l</sup>, где L — суммарная длина проводников слоя.</small></label>
+      <label class="f" for="trials">Испытаний Монте-Карло<input type="number" required id="trials" value="2000" min="200" step="1"></label>
+    </div>
+  </div>
+</details>
+<div><button type="button" class="primary" id="runBtn">Рассчитать</button></div>
+<details class="analysis-details" id="method-details"><summary>Сравнение методов и результаты по слоям</summary>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="tablewrap" id="regWrap" hidden><table id="regTab"></table></div>
+  <div class="tablewrap" id="layWrap" hidden><table id="layTab"></table></div>
+</details>
+<div class="notes" id="notes"></div>
+<details class="analysis-details" id="pad-details"><summary>Контактные площадки и каплевидные переходы</summary>
+  <p class="muted" id="pad-count"></p>
+  <label for="pad-type">Площадки в списке</label> <select id="pad-type">
+    <option value="all">Все</option><option value="ordinary">Обычные</option><option value="tear">С каплей</option>
+  </select>
+  <label for="pad-pick">Площадка на слое</label> <select id="pad-pick"><option value="">Выберите площадку</option></select>
+<section class="cols">
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Карта платы</h2>
+      <div class="row"><label class="f" for="mapLayer" style="gap:6px">Слой <select id="mapLayer"></select></label>
+      <label class="f" for="mapColor" style="gap:6px">Цвет КП <select id="mapColor"><option value="pm">точная область</option><option value="paf">вписанная окружность</option><option value="mc">Монте-Карло</option></select></label></div></div>
+    <div class="map"><canvas id="map" width="900" height="560" aria-label="Карта платы с вероятностью брака КП"></canvas></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>брак КП &lt; 10⁻⁴</span><span><i style="background:var(--warn)"></i>10⁻⁴…10⁻²</span><span><i style="background:var(--bad)"></i>&gt; 10⁻²</span><span>Протяните рамку, чтобы посчитать выход для участка. Щелчок по КП открывает её разбор.</span></div>
+    <div id="selBox" class="notes"></div>
+  </div>
+  <div class="card inspector">
+    <h2>Контактная площадка</h2>
+    <div id="insp" class="empty">Выберите КП на карте.</div>
+  </div>
+</section>
+</details>
+<details class="analysis-details" id="via-panel"><summary>Модель отдельного отверстия и капли</summary>
+<p class="muted" id="via-source">Задайте геометрию вручную или выберите площадку на карте.</p>
+<div id="pad-model"></div></details>
+</div>
+<!-- /board-analysis -->
+</main>
+<script src="jszip.min.js"></script>
+<script src="calc-profile.js"></script>
+<script src="via-view.js"></script>
+<script src="via.js"></script>
+<script src="gerber-engine.js"></script>
+<script src="gerber.js"></script>
+</body></html>

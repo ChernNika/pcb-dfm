@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import math
 import os
 import secrets
 import shutil
@@ -149,6 +150,16 @@ def check_args(choice: dict, opts: dict) -> list[str]:
         if method not in opts['b1_methods']:
             raise ValueError(f'неизвестный способ оценки B1: {method!r}')
         args += ['--set', f'b1.process={proc}', '--set', f'b1.method={method}']
+    changes = choice.get('parameters', {})
+    allowed = prof[path].get('parameters', {}).get('fields', {})
+    if not isinstance(changes, dict):
+        raise ValueError('ожидается список значений параметров производства')
+    for key, value in changes.items():
+        if key not in allowed or type(value) not in (float, int) or not math.isfinite(value):
+            raise ValueError(f'недопустимый параметр производства: {key}')
+        if value < 0 or (allowed[key]['positive'] and value == 0):
+            raise ValueError(f'значение вне диапазона: {key}')
+        args.extend(['--set', f'{key}={value}'])
     return args
 
 
@@ -268,6 +279,32 @@ AGAIN = (UI_DIR / 'report-actions.html').read_text(encoding='utf-8')
 TOKEN_HEADER = 'X-DFM-Token'
 
 
+CALCULATOR_FILES = {
+    'gerber.html', 'via.html', 'gerber.css', 'via.css', 'analysis-theme.css', 'gerber-engine.js',
+    'gerber.js', 'via-view.js', 'via.js', 'calc-profile.js', 'jszip.min.js',
+}
+
+
+def board_files(side, python):
+    """Экспортируем снимок редактора, включая несохранённую трассировку."""
+    with tempfile.TemporaryDirectory(prefix='dfm_gerber_') as temp:
+        board = side.snapshot(Path(temp))
+        out = Path(temp) / 'layers'
+        command = [python, '-m', 'dfm', 'export-gerber', str(board), '--out', str(out)]
+        result = subprocess.run(command, capture_output=True, encoding='utf-8', errors='replace',
+                                timeout=180, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        if result.returncode:
+            raise RuntimeError((result.stderr or result.stdout).strip()[-1500:])
+        files = []
+        for path in sorted(out.iterdir()):
+            # KiCad пишет медь как .gtl/.gbl/.g1 или .gbr. Назначение задано в заголовке X2.
+            with path.open(encoding='utf-8', errors='replace') as stream:
+                head = stream.read(4096)
+                if path.suffix.lower() == '.drl' or '%TF.FileFunction,Copper,' in head:
+                    files.append(dict(name=path.name, text=head + stream.read()))
+        return files
+
+
 def make_handler(job: Job, side, touch, cfg, token: str | None = None):
     """Обработчик запросов. Чужие страницы отсекаются: Host только 127.0.0.1/localhost с нашим портом
     (защита от DNS rebinding), а /start и /select — только с ключом сеанса из отданных нами страниц
@@ -322,6 +359,14 @@ def make_handler(job: Job, side, touch, cfg, token: str | None = None):
             u = urlparse(self.path)
             if u.path in ('/', '/index.html'):
                 return self._send(200, PAGE.replace('__DFM_TOKEN__', token).encode('utf-8'), 'text/html; charset=utf-8')
+            name = u.path.removeprefix('/')
+            if name in CALCULATOR_FILES:
+                data = (UI_DIR / name).read_bytes()
+                suffix = Path(name).suffix
+                mime = {'.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript'}[suffix]
+                if suffix == '.html':
+                    data = data.replace(b'__DFM_TOKEN__', token.encode('ascii'))
+                return self._send(200, data, mime + '; charset=utf-8')
             if u.path == '/options':
                 try:
                     last = load_config().get('last')
@@ -366,7 +411,8 @@ def make_handler(job: Job, side, touch, cfg, token: str | None = None):
             raw = self.rfile.read(n)                   # тело читаем сразу: отказ до чтения рвёт соединение
             if not self._host_ok():
                 return self._deny('чужой Host')
-            if urlparse(self.path).path != '/start':
+            endpoint = urlparse(self.path).path
+            if endpoint not in ('/start', '/board-gerbers'):
                 return self._send(404, b'', 'text/plain')
             # только JSON: простые межсайтовые запросы так не отправить (защита от запуска чужой страницей)
             if self.headers.get('Content-Type', '').split(';')[0].strip() != 'application/json':
@@ -378,6 +424,8 @@ def make_handler(job: Job, side, touch, cfg, token: str | None = None):
                 choice = json.loads(raw.decode('utf-8'))
                 if not isinstance(choice, dict):
                     raise ValueError('ожидается объект JSON')
+                if endpoint == '/board-gerbers':
+                    return self._json({'files': board_files(side, job.python)})
                 args = check_args(choice, get_options())
                 if not job.start(args):
                     raise RuntimeError('проверка уже идёт')
